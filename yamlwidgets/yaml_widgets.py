@@ -13,7 +13,7 @@ module_logger = logging.getLogger('yaml_widgets')
 class YamlWidgets():
     """ YamlWidgets Class """
 
-    def __init__(self):
+    def __init__(self, yaml_in=None):
         """ __init__ """
         #
         # Set up logging
@@ -32,6 +32,19 @@ class YamlWidgets():
         # Dictionary corresponding to final YAML values
         #
         self.yaml = {}
+
+        if yaml_in is not None:
+            self.setupWidgets(yaml_in)
+
+
+    @classmethod
+    def fromYAMLfile(cls, yaml_file):
+        """ Construct a set of YAML widgets from a file """
+
+        with open(yaml_file, "r") as f:
+            yaml_in = f.read()
+
+        return YamlWidgets(yaml_in)
 
 
     def setupWidgets(self, yaml_text):
@@ -115,6 +128,13 @@ class YamlWidgets():
         controls = interactive(self._set_params,**self.controls)
 
         display(controls)
+
+
+    def dumpYAMLfile(self, yaml_file):
+        """ Dump YAML file based on current state of widgets """
+
+        with open(yaml_file, "w") as f:
+            f.write(self.dumpWidgets())
 
 
     def dumpWidgets(self):
