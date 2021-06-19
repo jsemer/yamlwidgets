@@ -2,7 +2,9 @@
 
 import logging
 import re
-import yaml
+
+from ruamel.yaml import YAML
+from ruamel.yaml.compat import StringIO
 
 from IPython.display import display
 import ipywidgets as widgets
@@ -11,9 +13,15 @@ from ipywidgets import interactive
 module_logger = logging.getLogger('yaml_widgets')
 
 class YamlWidgets():
-    """ YamlWidgets Class """
+    """ YamlWidgets Class 
 
-    def __init__(self, yaml_in=None):
+    Notes:
+        - YAML tags of the form <name>-widget are special
+        - YAML tags cannot contain a dot (.)
+
+    """
+
+    def __init__(self, doc=None, title=""):
         """ __init__ """
         #
         # Set up logging
@@ -26,40 +34,75 @@ class YamlWidgets():
         # of the hierarchical YAML tags
         #
         self.controls = {}
-        self.controls['Title'] = widgets.Label(value=f"Tensor")
+        self.controls['Title'] = widgets.Label(value=title)
+
+        #
+        # Set up ruamel YAML
+        #
+        self.YAML = YAML()
 
         #
         # Dictionary corresponding to final YAML values
         #
-        self.yaml = {}
+        self.yaml = None
 
-        if yaml_in is not None:
-            self.setupWidgets(yaml_in)
+        if doc is not None:
+            self.load(doc)
 
 
     @classmethod
-    def fromYAMLfile(cls, yaml_file):
-        """ Construct a set of YAML widgets from a file """
+    def fromYAMLfile(cls, filename):
+        """ Construct a set of YAML widgets from a string filename """
 
-        with open(yaml_file, "r") as f:
+        with open(filename, "r") as f:
             yaml_in = f.read()
 
         return YamlWidgets(yaml_in)
 
 
-    def setupWidgets(self, yaml_text):
+    def load(self, doc):
         """ Setup Widgets for yaml """
 
         #
         # Convert YAML string into a dictionary and
         # create controls for each tag marked with a widget control
         #
-        yaml_dict = yaml.load(yaml_text, Loader=yaml.SafeLoader)
+        self.yaml = self.YAML.load(doc)
 
-        self._setupWidgets(yaml_dict, self.yaml)
+        self._setupWidgets(self.yaml)
 
 
-    def _setupWidgets(self, dict_in, dict_out, name=None):
+    def display(self):
+        """" Display the widgets """
+
+        controls = interactive(self._set_params,**self.controls)
+
+        display(controls)
+
+
+    def dump(self, doc=None):
+        """ Dump YAML document based on current state of widgets """
+
+        #
+        # When doc is None, return a string dump of the YAML
+        #
+        if doc is None:
+            return self.dump2string()
+
+        return self.YAML.dump(self.yaml, doc)
+
+
+    def dump2string(self):
+        """ Dump YAML document to a string """
+
+        stream = StringIO()
+        self.YAML.dump(self.yaml, stream)
+        return stream.getvalue()
+
+#
+# Internal utility functions
+#
+    def _setupWidgets(self, yaml_dict, name=None):
         """ Internal setup widgets """
 
         #
@@ -69,48 +112,53 @@ class YamlWidgets():
         #
 
         marker = r'-widget$'
+        control_tags = []
 
-        for tag, value in dict_in.items():
+        for tag, value in yaml_dict.items():
 
             #
             # Check if this is just a normal yaml entry
             #
             if not re.search(marker, tag):
                 #
-                # Check if we need to recurse
+                # Only need to do something if we need to recurse
                 #
                 if isinstance(value, dict):
-                    dict_out[tag] = {}
-                    self._setupWidgets(value, dict_out[tag], name=self._dotted_name(name, tag))
-                else:
-                    dict_out[tag] = value
+                    self._setupWidgets(value,
+                                       name=self._dotted_name(name, tag))
 
                 continue
 
             #
             # Process a yaml entry that describes a widget
+            # First, find actual tag that widget is setting
             #
+            target_tag = re.sub(marker, '', tag)
 
-            #
-            # Find name of entry that widget is setting
-            #
-            vname = re.sub(marker, '', tag)
-
-            widget_type = value['type']
-            widget_args = value['args']
+            widget_info = value
+            widget_type = widget_info['type']
+            widget_args = widget_info['args']
 
             if widget_type == "IntSlider":
-                name_string = self._dotted_name(name, vname)
+                flattened_name = self._dotted_name(name, target_tag)
 
                 if 'description' not in widget_args:
-                    widget_args['description'] = f'{name_string}'
+                    widget_args['description'] = f'{flattened_name}'
 
                 if 'value' not in widget_args:
-                    widget_args['value'] = dict_in[vname]
+                    widget_args['value'] = yaml_dict[target_tag]
 
                 new_control = widgets.IntSlider(**widget_args)
 
-                self.controls[name_string] = new_control
+                self.controls[flattened_name] = new_control
+
+            control_tags.append(tag)
+
+        #
+        # Remove all controls from the original yaml dictionary
+        #
+        for control_tag in control_tags:
+            del yaml_dict[control_tag]
 
 
     def _dotted_name(self, name1, name2):
@@ -120,29 +168,6 @@ class YamlWidgets():
             return name2
         else:
             return name1 + "." + name2
-
-
-    def displayWidgets(self):
-        """" Display the widgets """
-
-        controls = interactive(self._set_params,**self.controls)
-
-        display(controls)
-
-
-    def dumpYAMLfile(self, yaml_file):
-        """ Dump YAML file based on current state of widgets """
-
-        with open(yaml_file, "w") as f:
-            f.write(self.dumpWidgets())
-
-
-    def dumpWidgets(self):
-        """ Create yaml string based on the current values from the widgets """
-
-        yaml_text = yaml.dump(self.yaml, Dumper=yaml.SafeDumper)
-
-        return yaml_text
 
 
     def _set_params(self, **kwargs):

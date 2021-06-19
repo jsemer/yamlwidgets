@@ -1,17 +1,44 @@
-a: 2
-b: 3
+#
+# My YAML test
+#
+#
+# Tag a: uncontrolled, value = 2
+#
+a: 2          # An inlline comment
+#
+# Tag b: controlled, value = 3
+#
+b: 3          # Another inline comment
 b-widget:
     type: IntSlider
     args: {min: 1, max: 20, step: 1}
+#
+# Tag c: controlled, value = 3, controller_value = 4
+#
 c: 3
 c-widget:
     type: IntSlider
     args: {min: 1, max: 10, step: 1, value: 4}
+#
+# Tag d: controlled, value = 20, description = "The real D"
+#
 d: 20
 d-widget:
     type: IntSlider
     args: {description: "The real D", min: 0, max: 40, step: 5}
+#
+# Some uncontrolled non-alphabetical tags between "d" and "e"
+#
+z: 10
+y: 20
+x: 30
+#
+# Tag e: uncontrolled, value = 100
+#
 e: 100
+#
+# Nested items
+#
 m:
     m1: 1
     m2: 40
