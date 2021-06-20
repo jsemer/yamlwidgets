@@ -1,4 +1,4 @@
-""" Yaml Widgets Modules """
+""" Yaml Widgets Module """
 
 import logging
 import re
@@ -13,11 +13,44 @@ from ipywidgets import interactive
 module_logger = logging.getLogger('yaml_widgets')
 
 class YamlWidgets():
-    """ YamlWidgets Class 
+    """YamlWidgets Class 
 
-    Notes:
-        - YAML tags of the form <name>-widget are special
-        - YAML tags cannot contain a dot (.)
+    The YamlWidgets class is class used to create a set of control
+    widgets in a Jupyter notebook that allows the user to change the
+    values of some entries in a YAML document.
+
+    Attributes
+    ----------
+
+    The principal attributes of the YamlWidgets class are:
+
+    - `self.yaml`: The YAML document as read in using ruamel.yaml and
+      updated with values set by the control widgets
+
+    - `self.controls`: A dictionary with information about the entries
+      in the YAML document for which there are control widgets.
+
+    Constructor
+    -----------
+
+    The main constructor accepts a document in any form acceptable to
+    ruamel.yaml and creates controls for those tags with the special
+    form <target-tag>-widget.
+
+    Parameters
+    -----------
+
+    doc: string, Path() or class with a .read method, default=None
+        A YAML document with special tags to create control widgets
+
+    title: string, default=""
+        A title for the controls
+
+    Notes
+    -----
+      - Use `YamlWidgets.load()` to load a document when doc=None
+      - YAML tags of the form <target_tag>-widget are special
+      - YAML tags cannot contain a dot (.)
 
     """
 
@@ -51,17 +84,34 @@ class YamlWidgets():
 
 
     @classmethod
-    def fromYAMLfile(cls, filename):
-        """ Construct a set of YAML widgets from a string filename """
+    def fromYAMLfile(cls, filename, title=""):
+        """ Construct a set of YAML widgets from a string filename 
+
+        See main constructor for more information.
+
+        """
 
         with open(filename, "r") as f:
             yaml_in = f.read()
 
-        return YamlWidgets(yaml_in)
+        return YamlWidgets(yaml_in, title=title)
 
 
     def load(self, doc):
-        """ Setup Widgets for yaml """
+        """ Load a YAML document and create control widgets as specified
+
+        Parameters
+        -----------
+
+        doc: string, Path() or class with a .read method
+            A YAML document with special tags to create control widgets
+
+
+        Returns
+        -------
+        None
+
+        """
 
         #
         # Convert YAML string into a dictionary and
@@ -73,7 +123,17 @@ class YamlWidgets():
 
 
     def display(self):
-        """" Display the widgets """
+        """" Display the control widgets
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        """
 
         widgets = { tag: value['widget'] for tag, value in self.controls.items()}
 
@@ -82,8 +142,33 @@ class YamlWidgets():
         display(controls)
 
 
-    def dump(self, doc=None):
-        """ Dump YAML document based on current state of widgets """
+    def dump(self, doc=None, strip_controls=True):
+        """Dump YAML document based on current state of widgets 
+
+        Parameters
+        -----------
+
+        doc: Path() or class with a .write method
+            A YAML document to be written with the updated values
+
+        strip_controls: Bool, default-True
+            Strip out the tags in the YAML document that specify the
+            control widgets
+
+
+        Notes
+        -----
+
+        Once the tags specifying the control widgets are striped they
+        are gone forever
+
+        """
+
+        #
+        # Optionally strip the control tags
+        #
+        if strip_controls:
+            self._strip_controls()
 
         #
         # When doc is None, return a string dump of the YAML
@@ -127,7 +212,6 @@ class YamlWidgets():
 
 
         marker = r'-widget$'
-        control_tags = []
 
         for tag, value in yaml_dict.items():
 
@@ -204,13 +288,6 @@ class YamlWidgets():
                 control_info['widget'] = new_control
 
             self.controls[flattened_name] = control_info
-            control_tags.append(tag)
-
-        #
-        # Remove all controls from the original yaml dictionary
-        #
-        for control_tag in control_tags:
-            del yaml_dict[control_tag]
 
 
     def _dotted_name(self, name1, name2):
@@ -238,3 +315,30 @@ class YamlWidgets():
 
             target_dict[target_tag] = value
 
+
+    def _strip_controls(self, yaml_dict=None):
+        """ Strip out widget tags in the YAML dictionary """
+
+        if yaml_dict is None:
+            yaml_dict = self.yaml
+
+
+        marker = r'-widget$'
+        del_list = []
+
+        for tag, value in yaml_dict.items():
+            if re.search(marker, tag):
+                del_list.append(tag)
+                continue
+
+            if isinstance(value, dict):
+                self._strip_controls(value)
+                continue
+
+            if isinstance(value, list):
+                for list_value in value:
+                    self._strip_controls(list_value)
+
+        for tag in del_list:
+            self.logger.debug(f"Deleting {tag}")
+            del yaml_dict[tag]
