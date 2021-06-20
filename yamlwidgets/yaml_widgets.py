@@ -214,6 +214,7 @@ class YamlWidgets():
 
         for tag, value in yaml_dict.items():
 
+            self.logger.debug(f"Processing {tag}")
             #
             # Check if this is just a normal yaml entry, i.e., an
             # entry that does not have the marker for a control widget
@@ -228,10 +229,11 @@ class YamlWidgets():
                     new_name = self._flatten_name(name, tag)
                     self._setupWidgets(value, name=new_name)
 
-                if isinstance(value, list):
+                if isinstance(value, list) and not isinstance(value, str):
                     for n, list_value in enumerate(value):
                         new_name = self._flatten_name(name, f"{tag}[{n}]")
-                        self._setupWidgets(list_value, name=new_name)
+                        if isinstance(list_value, dict):
+                            self._setupWidgets(list_value, name=new_name)
 
                 continue
 
@@ -336,9 +338,10 @@ class YamlWidgets():
                 self._strip_controls(value)
                 continue
 
-            if isinstance(value, list):
+            if isinstance(value, list) and not isinstance(value, str):
                 for list_value in value:
-                    self._strip_controls(list_value)
+                    if isinstance(list_value, dict):
+                        self._strip_controls(list_value)
 
         for tag in del_list:
             del yaml_dict[tag]
