@@ -34,7 +34,7 @@ class YamlWidgets():
         # of the hierarchical YAML tags
         #
         self.controls = {}
-        self.controls['Title'] = widgets.Label(value=title)
+        self.controls['Title'] = {'widget': widgets.Label(value=title)}
 
         #
         # Set up ruamel YAML
@@ -69,13 +69,15 @@ class YamlWidgets():
         #
         self.yaml = self.YAML.load(doc)
 
-        self._setupWidgets(self.yaml)
+        self._setupWidgets()
 
 
     def display(self):
         """" Display the widgets """
 
-        controls = interactive(self._set_params,**self.controls)
+        widgets = { tag: value['widget'] for tag, value in self.controls.items()}
+
+        controls = interactive(self._set_params, **widgets)
 
         display(controls)
 
@@ -102,14 +104,27 @@ class YamlWidgets():
 #
 # Internal utility functions
 #
-    def _setupWidgets(self, yaml_dict, name=None):
-        """ Internal setup widgets """
+    def _setupWidgets(self, yaml_dict=None, name=None):
+        """Internal function to set up control widgets
 
-        #
-        # Take in YAML dictionary and create requested widget controls
-        # and create a new YAML dictionary with only data values (i.e.,
-        # without widget-related directives
-        #
+        This method recursively processes a YAML dictionary,
+        starting at `self.yaml`, and creates a record in
+        `self.controls` with the information on the target tags to be
+        controlled and creates the control widgets themselves for YAML
+        tags that will have controls. Those tags are identified by
+        special tags that look like '<target_tag>-widget', which have
+        specifications of the widget to be created. Note: those
+        special tags are stripped from the output YAML.
+
+        The dictionary tags in `self.controls` are a dot-separated
+        name comprised of all the hierarchical names in the YAML
+        hierarchy and markers for lists.
+
+        """
+
+        if yaml_dict is None:
+            yaml_dict = self.yaml
+
 
         marker = r'-widget$'
         control_tags = []
@@ -117,11 +132,14 @@ class YamlWidgets():
         for tag, value in yaml_dict.items():
 
             #
-            # Check if this is just a normal yaml entry
+            # Check if this is just a normal yaml entry, i.e., an
+            # entry that does not have the marker for a control widget
+            # '<target_tag>-widget'
             #
             if not re.search(marker, tag):
                 #
-                # Only need to do something if we need to recurse
+                # Only need to do something if we need to recurse for
+                # a subtree in the YAML or for a YAML list
                 #
                 if isinstance(value, dict):
                     new_name = self._dotted_name(name, tag)
@@ -135,17 +153,37 @@ class YamlWidgets():
                 continue
 
             #
-            # Process a yaml entry that describes a widget
-            # First, find actual tag that widget is setting
+            # Fall through to here to process a YAML tag entry for a
+            # control widget.
+            #
+            # For each such tag, we will create an entry in
+            # `self.controls` that contains the target_{dict,tag} to
+            # be updated and the associated control widget.
             #
             target_tag = re.sub(marker, '', tag)
 
+            #
+            # Create a flattened dot-separated name for this entry
+            #
+            flattened_name = self._dotted_name(name, target_tag)
+
+            #
+            # Memoize the target_{dict,tag} for this control
+            #
+            control_info = {}
+            control_info['target_dict'] = yaml_dict
+            control_info['target_tag'] = target_tag
+
+            #
+            # Parse the information about the control widget
+            #
             widget_info = value
             widget_type = widget_info['type']
             widget_args = widget_info['args']
 
-            flattened_name = self._dotted_name(name, target_tag)
-
+            #
+            # Create widget for this target_{dict,tag}
+            #
             standard_widgets = ["IntSlider",
                                 "FloatLogSlider" ]
 
@@ -159,12 +197,13 @@ class YamlWidgets():
 
             if widget_type == "IntSlider":
                 new_control = widgets.IntSlider(**widget_args)
-                self.controls[flattened_name] = new_control
+                control_info['widget'] = new_control
 
             if widget_type == "FloatLogSlider":
                 new_control = widgets.FloatLogSlider(**widget_args)
-                self.controls[flattened_name] = new_control
+                control_info['widget'] = new_control
 
+            self.controls[flattened_name] = control_info
             control_tags.append(tag)
 
         #
@@ -187,40 +226,15 @@ class YamlWidgets():
         """ Set values in yaml dictionary based on current values in the widgets """
 
         for variable, value in kwargs.items():
-            if variable in ['Title']:
+            control_info = self.controls[variable]
+
+            if 'target_tag' not in control_info:
                 continue
 
             self.logger.debug(f"Setting {variable} to {value}")
 
-            self._set_variable(self.yaml, variable, value)
+            target_dict = control_info['target_dict']
+            target_tag = control_info['target_tag']
 
+            target_dict[target_tag] = value
 
-    def _set_variable(self, yaml_dict, variable, value):
-        """ Set value in hierarchical dictionary based on dotted variable name """
-
-        if '.' not in variable:
-            if isinstance(value, float) and value == float(int(value)):
-                value = int(value)
-
-            yaml_dict[variable] = value
-            return
-
-        name = re.sub(r"\..*", "", variable)
-
-        index = re.sub(r".*\[(.*)\]", r"\1", name)
-        if name == index:
-            index = ""
-        else:
-            name = re.sub(r"\[.*", "", name)
-
-        rest = re.sub(r"^[^.]*\.", "", variable)
-
-        if name not in yaml_dict:
-            print(f"Did not find {name} in {yaml_dict}")
-            return
-
-        if len(index) == 0:
-            self._set_variable(yaml_dict[name], rest, value)
-        else:
-            name = re.sub(r"\[.*", "", name)
-            self._set_variable(yaml_dict[name][int(index)], rest, value)
