@@ -144,8 +144,12 @@ class YamlWidgets():
             widget_type = widget_info['type']
             widget_args = widget_info['args']
 
-            if widget_type == "IntSlider":
-                flattened_name = self._dotted_name(name, target_tag)
+            flattened_name = self._dotted_name(name, target_tag)
+
+            standard_widgets = ["IntSlider",
+                                "FloatLogSlider" ]
+
+            if widget_type in standard_widgets:
 
                 if 'description' not in widget_args:
                     widget_args['description'] = f'{flattened_name}'
@@ -153,8 +157,12 @@ class YamlWidgets():
                 if 'value' not in widget_args:
                     widget_args['value'] = yaml_dict[target_tag]
 
+            if widget_type == "IntSlider":
                 new_control = widgets.IntSlider(**widget_args)
+                self.controls[flattened_name] = new_control
 
+            if widget_type == "FloatLogSlider":
+                new_control = widgets.FloatLogSlider(**widget_args)
                 self.controls[flattened_name] = new_control
 
             control_tags.append(tag)
@@ -191,6 +199,9 @@ class YamlWidgets():
         """ Set value in hierarchical dictionary based on dotted variable name """
 
         if '.' not in variable:
+            if isinstance(value, float) and value == float(int(value)):
+                value = int(value)
+
             yaml_dict[variable] = value
             return
 
