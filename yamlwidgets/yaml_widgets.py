@@ -50,7 +50,7 @@ class YamlWidgets():
     -----
       - Use `YamlWidgets.load()` to load a document when doc=None
       - YAML tags of the form <target_tag>-widget are special
-      - YAML tags cannot contain a dot (.)
+      - YAML tags probably should not contain a slash ("/") used by flatten_name
 
     """
 
@@ -62,9 +62,8 @@ class YamlWidgets():
         self.logger = logging.getLogger('yaml_widgets')
 
         #
-        # Single level dictionary of widget controls
-        # where key is a flattened (dot-separated) string
-        # of the hierarchical YAML tags
+        # Single level dictionary of widget controls where key is a
+        # flattened string of the hierarchical YAML tags
         #
         self.controls = {}
         self.controls['Title'] = {'widget': widgets.Label(value=title)}
@@ -201,9 +200,9 @@ class YamlWidgets():
         specifications of the widget to be created. Note: those
         special tags are stripped from the output YAML.
 
-        The dictionary tags in `self.controls` are a dot-separated
-        name comprised of all the hierarchical names in the YAML
-        hierarchy and markers for lists.
+        The dictionary tags in `self.controls` are a flattened name
+        comprised of all the hierarchical names in the YAML hierarchy
+        and markers for lists.
 
         """
 
@@ -226,12 +225,12 @@ class YamlWidgets():
                 # a subtree in the YAML or for a YAML list
                 #
                 if isinstance(value, dict):
-                    new_name = self._dotted_name(name, tag)
+                    new_name = self._flatten_name(name, tag)
                     self._setupWidgets(value, name=new_name)
 
                 if isinstance(value, list):
                     for n, list_value in enumerate(value):
-                        new_name = self._dotted_name(name, f"{tag}[{n}]")
+                        new_name = self._flatten_name(name, f"{tag}[{n}]")
                         self._setupWidgets(list_value, name=new_name)
 
                 continue
@@ -247,9 +246,9 @@ class YamlWidgets():
             target_tag = re.sub(marker, '', tag)
 
             #
-            # Create a flattened dot-separated name for this entry
+            # Create a flattened name for this entry
             #
-            flattened_name = self._dotted_name(name, target_tag)
+            flattened_name = self._flatten_name(name, target_tag)
 
             #
             # Memoize the target_{dict,tag} for this control
@@ -274,6 +273,7 @@ class YamlWidgets():
             if widget_type in standard_widgets:
 
                 if 'description' not in widget_args:
+                    # TBD: Change separator for flattened_name for display...
                     widget_args['description'] = f'{flattened_name}'
 
                 if 'value' not in widget_args:
@@ -290,13 +290,13 @@ class YamlWidgets():
             self.controls[flattened_name] = control_info
 
 
-    def _dotted_name(self, name1, name2):
-        """ Append a new name to a dot-separated string"""
+    def _flatten_name(self, name1, name2):
+        """ Append a new name to a slash-separated string"""
 
         if name1 is None:
             return name2
         else:
-            return name1 + "." + name2
+            return name1 + "/" + name2
 
 
     def _set_params(self, **kwargs):
@@ -308,10 +308,11 @@ class YamlWidgets():
             if 'target_tag' not in control_info:
                 continue
 
-            self.logger.debug(f"Setting {variable} to {value}")
-
             target_dict = control_info['target_dict']
             target_tag = control_info['target_tag']
+
+            if target_dict[target_tag] != value:
+                self.logger.debug(f"Setting {variable} to {value}")
 
             target_dict[target_tag] = value
 
@@ -340,5 +341,4 @@ class YamlWidgets():
                     self._strip_controls(list_value)
 
         for tag in del_list:
-            self.logger.debug(f"Deleting {tag}")
             del yaml_dict[tag]
