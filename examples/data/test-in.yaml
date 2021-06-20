@@ -37,6 +37,28 @@ x: 30
 #
 e: 100
 #
+# Lists
+#
+l:
+  - name: l1
+    ldata1: 5
+    ldata2: 5
+    ldata2-widget:
+      type: IntSlider
+      args: {description: "l1-data2", min: 0, max: 20, step: 5}
+  - name: l2
+    ldata1: 10
+    ldata2: 10
+    ldata2-widget:
+      type: IntSlider
+      args: {description: "l2-data2", min: 0, max: 20, step: 5}
+  - name: l2
+    ldata1: 15
+    ldata1-widget:
+      type: IntSlider
+      args: {description: "l3-data2", min: 0, max: 20, step: 5}
+    ldata2: 15
+#
 # Nested items
 #
 m:

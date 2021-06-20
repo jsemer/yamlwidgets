@@ -124,8 +124,13 @@ class YamlWidgets():
                 # Only need to do something if we need to recurse
                 #
                 if isinstance(value, dict):
-                    self._setupWidgets(value,
-                                       name=self._dotted_name(name, tag))
+                    new_name = self._dotted_name(name, tag)
+                    self._setupWidgets(value, name=new_name)
+
+                if isinstance(value, list):
+                    for n, list_value in enumerate(value):
+                        new_name = self._dotted_name(name, f"{tag}[{n}]")
+                        self._setupWidgets(list_value, name=new_name)
 
                 continue
 
@@ -190,10 +195,21 @@ class YamlWidgets():
             return
 
         name = re.sub(r"\..*", "", variable)
+
+        index = re.sub(r".*\[(.*)\]", r"\1", name)
+        if name == index:
+            index = ""
+        else:
+            name = re.sub(r"\[.*", "", name)
+
         rest = re.sub(r"^[^.]*\.", "", variable)
 
         if name not in yaml_dict:
             print(f"Did not find {name} in {yaml_dict}")
             return
 
-        self._set_variable(yaml_dict[name], rest, value)
+        if len(index) == 0:
+            self._set_variable(yaml_dict[name], rest, value)
+        else:
+            name = re.sub(r"\[.*", "", name)
+            self._set_variable(yaml_dict[name][int(index)], rest, value)
