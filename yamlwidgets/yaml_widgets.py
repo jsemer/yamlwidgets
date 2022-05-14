@@ -264,13 +264,17 @@ class YamlWidgets():
             #
             widget_info = value
             widget_type = widget_info['type']
-            widget_args = widget_info['args']
+            widget_args = {}
+            if 'args' in widget_info:
+                widget_args = widget_info['args']
 
             #
             # Create widget for this target_{dict,tag}
             #
             standard_widgets = ["IntSlider",
-                                "FloatLogSlider" ]
+                                "FloatLogSlider",
+                                "Dropdown",
+                                "Label"]
 
             if widget_type in standard_widgets:
 
@@ -287,6 +291,14 @@ class YamlWidgets():
 
             if widget_type == "FloatLogSlider":
                 new_control = widgets.FloatLogSlider(**widget_args)
+                control_info['widget'] = new_control
+
+            if widget_type == "Dropdown":
+                new_control = widgets.Dropdown(**widget_args)
+                control_info['widget'] = new_control
+
+            if widget_type == "Label":
+                new_control = widgets.Label(**widget_args)
                 control_info['widget'] = new_control
 
             self.controls[flattened_name] = control_info
