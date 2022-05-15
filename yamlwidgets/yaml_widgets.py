@@ -27,8 +27,12 @@ class YamlWidgets():
     - `self.yaml`: The YAML document as read in using ruamel.yaml and
       updated with values set by the control widgets
 
-    - `self.controls`: A dictionary with information about the entries
-      in the YAML document for which there are control widgets.
+    - `self.controls`: A dictionary with information about the ALL the
+      entries in the YAML document for which there are control
+      widgets.
+
+    - `self.widgets`: A dictionary of just the top-level widgets
+
 
     Constructor
     -----------
@@ -62,11 +66,24 @@ class YamlWidgets():
         self.logger = logging.getLogger('yaml_widgets')
 
         #
-        # Single level dictionary of widget controls where key is a
-        # flattened string of the hierarchical YAML tags
+        # Single level dictionary of ALL widget controls where key is
+        # a flattened string of the hierarchical YAML tags
         #
         self.controls = {}
-        self.controls['Title'] = {'widget': widgets.Label(value=title)}
+        self.controls['Title'] = {}
+
+        #
+        # Single level dictionary of just the top-level widgets where key
+        # is a flattened string of the hierarchical YAML tags
+        #
+        self.widgets = {}
+        self.widgets['Title'] = {'widget': widgets.Label(value=title)}
+
+        #
+        # Set up a top level widget
+        #
+        widget_info = {'type': "Label", 'args': {'value': "foo"}}
+        self._createWidget(widget_info, "Title")
 
         #
         # Set up ruamel YAML
@@ -134,9 +151,7 @@ class YamlWidgets():
 
         """
 
-        widgets = { tag: value['widget'] for tag, value in self.controls.items()}
-
-        controls = interactive(self._set_params, **widgets)
+        controls = interactive(self._set_params, **self.widgets)
 
         display(controls)
 
@@ -194,15 +209,16 @@ class YamlWidgets():
         This method recursively processes a YAML dictionary,
         starting at `self.yaml`, and creates a record in
         `self.controls` with the information on the target tags to be
-        controlled and creates the control widgets themselves for YAML
+        controlled. It also creates `self.widgets` with the top-level
+        widgets. And it also creates the control widgets themselves for YAML
         tags that will have controls. Those tags are identified by
         special tags that look like '<target_tag>-widget', which have
         specifications of the widget to be created. Note: those
         special tags are stripped from the output YAML.
 
-        The dictionary tags in `self.controls` are a flattened name
-        comprised of all the hierarchical names in the YAML hierarchy
-        and markers for lists.
+        The dictionary tags in `self.controls` and `self.widgets` are
+        a flattened name comprised of all the hierarchical names in
+        the YAML hierarchy and markers for lists.
 
         """
 
@@ -226,10 +242,16 @@ class YamlWidgets():
                 # a subtree in the YAML or for a YAML list
                 #
                 if isinstance(value, dict):
+                    #
+                    # Recurse to next level for simple subtrees
+                    #
                     new_name = self._flatten_name(name, tag)
                     self._setupWidgets(value, name=new_name)
 
                 if isinstance(value, list) and not isinstance(value, str):
+                    #
+                    # Recurse to next level for each entry in a list that is a subtree
+                    #
                     for n, list_value in enumerate(value):
                         new_name = self._flatten_name(name, f"{tag}[{n}]")
                         if isinstance(list_value, dict):
@@ -253,55 +275,69 @@ class YamlWidgets():
             flattened_name = self._flatten_name(name, target_tag)
 
             #
-            # Memoize the target_{dict,tag} for this control
+            # Create the widget and control structures
             #
-            control_info = {}
-            control_info['target_dict'] = yaml_dict
-            control_info['target_tag'] = target_tag
+            self._createWidget(value, flattened_name, yaml_dict, target_tag)
 
-            #
-            # Parse the information about the control widget
-            #
-            widget_info = value
-            widget_type = widget_info['type']
-            widget_args = {}
-            if 'args' in widget_info:
-                widget_args = widget_info['args']
 
-            #
-            # Create widget for this target_{dict,tag}
-            #
-            standard_widgets = ["IntSlider",
-                                "FloatLogSlider",
-                                "Dropdown",
-                                "Label"]
+    def _createWidget(self,
+                      widget_info,
+                      flattened_name,
+                      yaml_dict={},
+                      target_tag=""):
+        """Internal function actually create the control widgets
 
-            if widget_type in standard_widgets:
+        """
+        #
+        # Memoize the target_{dict,tag} for this control
+        #
+        control_info = {}
+        control_info['target_dict'] = yaml_dict
+        control_info['target_tag'] = target_tag
 
-                if 'description' not in widget_args:
-                    # TBD: Change separator for flattened_name for display...
-                    widget_args['description'] = f'{flattened_name}'
+        #
+        # Parse the information about the control widget
+        #
+        widget_type = widget_info['type']
+        widget_args = {}
+        if 'args' in widget_info:
+            widget_args = widget_info['args']
 
-                if 'value' not in widget_args:
-                    widget_args['value'] = yaml_dict[target_tag]
+        #
+        # Create widget for this target_{dict,tag}
+        #
+        standard_widgets = ["IntSlider",
+                            "FloatLogSlider",
+                            "Dropdown",
+                            "Label"]
 
-            if widget_type == "IntSlider":
-                new_control = widgets.IntSlider(**widget_args)
-                control_info['widget'] = new_control
+        if widget_type in standard_widgets:
 
-            if widget_type == "FloatLogSlider":
-                new_control = widgets.FloatLogSlider(**widget_args)
-                control_info['widget'] = new_control
+            if 'description' not in widget_args:
+                # TBD: Change separator for flattened_name for display...
+                widget_args['description'] = f'{flattened_name}'
 
-            if widget_type == "Dropdown":
-                new_control = widgets.Dropdown(**widget_args)
-                control_info['widget'] = new_control
+            if 'value' not in widget_args:
+                widget_args['value'] = yaml_dict[target_tag]
 
-            if widget_type == "Label":
-                new_control = widgets.Label(**widget_args)
-                control_info['widget'] = new_control
+        if widget_type == "IntSlider":
+            new_control = widgets.IntSlider(**widget_args)
+            control_info['widget'] = new_control
 
-            self.controls[flattened_name] = control_info
+        if widget_type == "FloatLogSlider":
+            new_control = widgets.FloatLogSlider(**widget_args)
+            control_info['widget'] = new_control
+
+        if widget_type == "Dropdown":
+            new_control = widgets.Dropdown(**widget_args)
+            control_info['widget'] = new_control
+
+        if widget_type == "Label":
+            new_control = widgets.Label(**widget_args)
+            control_info['widget'] = new_control
+
+        self.controls[flattened_name] = control_info
+        self.widgets[flattened_name] = control_info['widget']
 
 
     def _flatten_name(self, name1, name2):
@@ -322,13 +358,21 @@ class YamlWidgets():
             if 'target_tag' not in control_info:
                 continue
 
+            if 'target_dict' not in control_info:
+                continue
+            
             target_dict = control_info['target_dict']
             target_tag = control_info['target_tag']
 
+            if target_tag not in target_dict:
+                continue
+            
+            #
+            # Check if value needs to be updated
+            #
             if target_dict[target_tag] != value:
                 self.logger.debug(f"Setting {variable} to {value}")
-
-            target_dict[target_tag] = value
+                target_dict[target_tag] = value
 
 
     def _strip_controls(self, yaml_dict=None):
