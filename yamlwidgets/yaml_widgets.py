@@ -322,18 +322,26 @@ class YamlWidgets():
 
         if widget_type == "IntSlider":
             new_control = widgets.IntSlider(**widget_args)
+            new_control.observe(self._set_params)
+
             control_info['widget'] = new_control
 
         if widget_type == "FloatLogSlider":
             new_control = widgets.FloatLogSlider(**widget_args)
+            new_control.observe(self._set_params)
+
             control_info['widget'] = new_control
 
         if widget_type == "Dropdown":
             new_control = widgets.Dropdown(**widget_args)
+            new_control.observe(self._set_params)
+
             control_info['widget'] = new_control
 
         if widget_type == "Label":
             new_control = widgets.Label(**widget_args)
+            new_control.observe(self._set_params)
+
             control_info['widget'] = new_control
 
         self.controls[flattened_name] = control_info
@@ -349,24 +357,37 @@ class YamlWidgets():
             return name1 + "/" + name2
 
 
-    def _set_params(self, **kwargs):
+    def _set_params(self, change):
         """ Set values in yaml dictionary based on current values in the widgets """
 
-        for variable, value in kwargs.items():
-            control_info = self.controls[variable]
+        widget = change.owner
+        value = widget.value
 
+        #
+        # Scan all the widgets
+        #
+        for variable, control_info in self.controls.items():
+            #
+            # Check if this the the widget that was updated
+            #
+            if control_info['widget'] != widget:
+                continue
+
+            #
+            # Lots of checks to make sure the widget is for something in the YAML
+            #
             if 'target_tag' not in control_info:
                 continue
 
             if 'target_dict' not in control_info:
                 continue
-            
+
             target_dict = control_info['target_dict']
             target_tag = control_info['target_tag']
 
             if target_tag not in target_dict:
                 continue
-            
+
             #
             # Check if value needs to be updated
             #
