@@ -14,8 +14,20 @@ from .container_widgets import ContainerWidgets
 
 module_logger = logging.getLogger('yaml_widgets')
 
+class WidgetInfo():
+    """ Information about each widget type """
+
+    def __init__(self, widget, standard, container):
+        """ Initailize a widget type """
+
+        self.widget = widget
+        self.standard = standard
+        self.container = container
+
+
+
 class YamlWidgets():
-    """YamlWidgets Class 
+    """YamlWidgets Class
 
     The YamlWidgets class is class used to create a set of control
     widgets in a Jupyter notebook that allows the user to change the
@@ -58,7 +70,7 @@ class YamlWidgets():
 
     """
 
-    def __init__(self, doc=None, title=""):
+    def __init__(self, doc=None, title="Title"):
         """ __init__ """
         #
         # Set up logging
@@ -66,11 +78,15 @@ class YamlWidgets():
         self.logger = logging.getLogger('yaml_widgets')
 
         #
+        # Define information about the different kinds of widgets
+        #
+        self.widgetinfo = self._defineWidgetInfo()
+
+        #
         # Single level dictionary of ALL widget controls where key is
         # a flattened string of the hierarchical YAML tags
         #
         self.controls = {}
-        self.controls['Title'] = {}
 
         #
         # Create container management object and start outer container
@@ -81,7 +97,7 @@ class YamlWidgets():
         #
         # Set up a top level widget
         #
-        widget_info = {'type': "Label", 'args': {'value': "foo"}}
+        widget_info = {'type': "Label", 'args': {'value': title}}
         self._createWidget(widget_info, "Title")
 
         #
@@ -97,10 +113,41 @@ class YamlWidgets():
         if doc is not None:
             self.load(doc)
 
+    def _defineWidgetInfo(self):
+
+        wi = {}
+
+        #
+        # Ordinary controls
+        #
+        wi['Label'] = WidgetInfo(widgets.Label, True, False)
+        wi['Text'] = WidgetInfo(widgets.Text, True, False)
+
+        wi['IntSlider'] = WidgetInfo(widgets.IntSlider, True, False)
+        wi['BoundedIntText'] = WidgetInfo(widgets.BoundedIntText, True, False)
+        wi['IntText'] = WidgetInfo(widgets.IntText, True, False)
+
+        wi['FloatLogSlider'] = WidgetInfo(widgets.FloatLogSlider, True, False)
+        wi['BoundedFloatText'] = WidgetInfo(widgets.BoundedFloatText, True, False)
+        wi['FloatText'] = WidgetInfo(widgets.FloatText, True, False)
+
+        wi['Checkbox'] = WidgetInfo(widgets.Checkbox, True, False)
+
+        wi['Dropdown'] = WidgetInfo(widgets.Dropdown, True, False)
+        wi['RadioButtons'] = WidgetInfo(widgets.RadioButtons, True, False)
+
+        #
+        # Container controls
+        #
+        wi['Tab'] = WidgetInfo(widgets.Tab, False, True)
+        wi['VBox'] = WidgetInfo(widgets.VBox, False, True)
+
+        return wi
+
 
     @classmethod
     def fromYAMLfile(cls, filename, title=""):
-        """ Construct a set of YAML widgets from a string filename 
+        """ Construct a set of YAML widgets from a string filename
 
         See main constructor for more information.
 
@@ -155,7 +202,7 @@ class YamlWidgets():
 
 
     def dump(self, doc=None, strip_controls=True):
-        """Dump YAML document based on current state of widgets 
+        """Dump YAML document based on current state of widgets
 
         Parameters
         -----------
@@ -301,14 +348,16 @@ class YamlWidgets():
             widget_args = widget_info['args']
 
         #
+        # Extract the chanacteristics of the widget
+        #
+        widget_constructor = self.widgetinfo[widget_type].widget
+        widget_standard = self.widgetinfo[widget_type].standard
+        widget_container = self.widgetinfo[widget_type].container
+
+        #
         # Create widget for this target_{dict,tag}
         #
-        standard_widgets = ["IntSlider",
-                            "FloatLogSlider",
-                            "Dropdown",
-                            "Label"]
-
-        if widget_type in standard_widgets:
+        if widget_standard:
 
             if 'description' not in widget_args:
                 # TBD: Change separator for flattened_name for display...
@@ -318,54 +367,28 @@ class YamlWidgets():
                 widget_args['value'] = yaml_dict[target_tag]
 
         #
-        # Handle container widgets
+        # Handle container widgets ("Tab" and "Vbox")
         #
-        if widget_type == "Tab":
-            self.logger.debug(f"Starting tab: {yaml_dict[target_tag]}")
+        if widget_container:
+            self.logger.debug(f"Starting {widget_type}: {yaml_dict[target_tag]}")
             widget_name = yaml_dict[target_tag]
 
-            new_control = self.containers.startContainer("Tab", name=widget_name)
+            new_control = self.containers.startContainer(widget_type, name=widget_name)
 
             control_info['widget'] = new_control
 
-        if widget_type == "VBox":
-            self.logger.debug(f"Starting vbox: {yaml_dict[target_tag]}")
-            widget_name = yaml_dict[target_tag]
-
-            new_control = self.containers.startContainer("VBox", name=widget_name)
-
-            control_info['widget'] = new_control
+            self.controls[flattened_name] = control_info
 
         #
         # Handle normal widgets
         #
-        if widget_type == "IntSlider":
-            new_control = widgets.IntSlider(**widget_args)
+        if not widget_container:
+            new_control = widget_constructor(**widget_args)
             new_control.observe(self._set_params)
 
             control_info['widget'] = new_control
 
-        if widget_type == "FloatLogSlider":
-            new_control = widgets.FloatLogSlider(**widget_args)
-            new_control.observe(self._set_params)
-
-            control_info['widget'] = new_control
-
-        if widget_type == "Dropdown":
-            new_control = widgets.Dropdown(**widget_args)
-            new_control.observe(self._set_params)
-
-            control_info['widget'] = new_control
-
-        if widget_type == "Label":
-            new_control = widgets.Label(**widget_args)
-            new_control.observe(self._set_params)
-
-            control_info['widget'] = new_control
-
-        self.controls[flattened_name] = control_info
-
-        if widget_type not in ["VBox", "Tab"]:
+            self.controls[flattened_name] = control_info
             self.containers.addChild(control_info['widget'])
 
 
