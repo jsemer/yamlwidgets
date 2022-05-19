@@ -10,6 +10,8 @@ from IPython.display import display
 import ipywidgets as widgets
 from ipywidgets import interactive
 
+from .container_widgets import ContainerWidgets
+
 module_logger = logging.getLogger('yaml_widgets')
 
 class YamlWidgets():
@@ -30,8 +32,6 @@ class YamlWidgets():
     - `self.controls`: A dictionary with information about the ALL the
       entries in the YAML document for which there are control
       widgets.
-
-    - `self.widgets`: A dictionary of just the top-level widgets
 
 
     Constructor
@@ -73,11 +73,10 @@ class YamlWidgets():
         self.controls['Title'] = {}
 
         #
-        # Single level dictionary of just the top-level widgets where key
-        # is a flattened string of the hierarchical YAML tags
+        # Create container management object and start outer container
         #
-        self.widgets = {}
-        self.widgets['Title'] = {'widget': widgets.Label(value=title)}
+        self.containers = ContainerWidgets()
+        self.containers.startContainer("VBox",name="ROOT")
 
         #
         # Set up a top level widget
@@ -151,8 +150,7 @@ class YamlWidgets():
 
         """
 
-        controls = interactive(self._set_params, **self.widgets)
-
+        controls = self.containers.finishContainer(finish_all=True)
         display(controls)
 
 
@@ -209,16 +207,15 @@ class YamlWidgets():
         This method recursively processes a YAML dictionary,
         starting at `self.yaml`, and creates a record in
         `self.controls` with the information on the target tags to be
-        controlled. It also creates `self.widgets` with the top-level
-        widgets. And it also creates the control widgets themselves for YAML
+        controlled. And it also creates the control widgets themselves for YAML
         tags that will have controls. Those tags are identified by
         special tags that look like '<target_tag>-widget', which have
         specifications of the widget to be created. Note: those
         special tags are stripped from the output YAML.
 
-        The dictionary tags in `self.controls` and `self.widgets` are
-        a flattened name comprised of all the hierarchical names in
-        the YAML hierarchy and markers for lists.
+        The dictionary tags in `self.controls` are a flattened name
+        comprised of all the hierarchical names in the YAML hierarchy
+        and markers for lists.
 
         """
 
@@ -320,6 +317,28 @@ class YamlWidgets():
             if 'value' not in widget_args:
                 widget_args['value'] = yaml_dict[target_tag]
 
+        #
+        # Handle container widgets
+        #
+        if widget_type == "Tab":
+            self.logger.debug(f"Starting tab: {yaml_dict[target_tag]}")
+            widget_name = yaml_dict[target_tag]
+
+            new_control = self.containers.startContainer("Tab", name=widget_name)
+
+            control_info['widget'] = new_control
+
+        if widget_type == "VBox":
+            self.logger.debug(f"Starting vbox: {yaml_dict[target_tag]}")
+            widget_name = yaml_dict[target_tag]
+
+            new_control = self.containers.startContainer("VBox", name=widget_name)
+
+            control_info['widget'] = new_control
+
+        #
+        # Handle normal widgets
+        #
         if widget_type == "IntSlider":
             new_control = widgets.IntSlider(**widget_args)
             new_control.observe(self._set_params)
@@ -345,7 +364,9 @@ class YamlWidgets():
             control_info['widget'] = new_control
 
         self.controls[flattened_name] = control_info
-        self.widgets[flattened_name] = control_info['widget']
+
+        if widget_type not in ["VBox", "Tab"]:
+            self.containers.addChild(control_info['widget'])
 
 
     def _flatten_name(self, name1, name2):
