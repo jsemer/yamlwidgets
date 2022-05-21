@@ -13,6 +13,9 @@ from ipywidgets import interactive
 from .container_widgets import ContainerWidgets
 
 module_logger = logging.getLogger('yaml_widgets')
+debug1 = logging.DEBUG+1
+debug2 = logging.DEBUG+2
+
 
 class WidgetInfo():
     """ Information about each widget type """
@@ -321,14 +324,29 @@ class YamlWidgets():
             #
             # Create the widget and control structures
             #
-            self._createWidget(value, flattened_name, yaml_dict, target_tag)
+            if not isinstance(value, list):
+                #
+                # Handle a single widget directive
+                #
+                self.logger.log(debug2, f"Not in list {value}")
+                self._createWidget(value, flattened_name, yaml_dict, target_tag)
+            else:
+                #
+                # Handle a list of widget directives
+                #
+                for n, v in enumerate(value):
+                    self.logger.log(debug2, f"In list {n}, {v}")
+                    if n == 0:
+                        self._createWidget(v, flattened_name, yaml_dict, target_tag)
+                    else:
+                        self._createWidget(v, f"{flattened_name}-{n}", yaml_dict, target_tag)
 
 
     def _createWidget(self,
                       widget_info,
                       flattened_name,
-                      yaml_dict={},
-                      target_tag=""):
+                      yaml_dict=None,
+                      target_tag="dummy"):
         """Internal function actually create the control widgets
 
         """
@@ -338,6 +356,15 @@ class YamlWidgets():
         control_info = {}
         control_info['target_dict'] = yaml_dict
         control_info['target_tag'] = target_tag
+
+        #
+        # Make sure there is some value in the target_dict
+        #
+        if yaml_dict is None:
+            yaml_dict = {}
+
+        if target_tag not in yaml_dict:
+            yaml_dict[target_tag] = None
 
         #
         # Parse the information about the control widget
@@ -410,6 +437,8 @@ class YamlWidgets():
         #
         # Scan all the widgets
         #
+        # TBD: Just go directly to correct widget
+        #
         for variable, control_info in self.controls.items():
             #
             # Check if this the the widget that was updated
@@ -418,19 +447,10 @@ class YamlWidgets():
                 continue
 
             #
-            # Lots of checks to make sure the widget is for something in the YAML
+            # Get target information (which is known to exist!)
             #
-            if 'target_tag' not in control_info:
-                continue
-
-            if 'target_dict' not in control_info:
-                continue
-
             target_dict = control_info['target_dict']
             target_tag = control_info['target_tag']
-
-            if target_tag not in target_dict:
-                continue
 
             #
             # Check if value needs to be updated
