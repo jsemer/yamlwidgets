@@ -4,12 +4,18 @@ import logging
 
 import ipywidgets as widgets
 
-module_logger = logging.getLogger('yaml_widgets')
+module_logger = logging.getLogger('container_widgets')
+
 
 class ContainerState():
     """Object to hold ContainerWidgets current widget state"""
 
     def __init__(self, ctype=None, cname=None, widget=None):
+        #
+        # Set up logging
+        #
+        self.logger = logging.getLogger('container_widgets')
+
         #
         # Information about current container
         #
@@ -35,12 +41,17 @@ class ContainerWidgets():
 
     """
 
-    def __init__(self):
+    def __init__(self, widget_info):
         """ __init__ """
         #
         # Set up logging
         #
         self.logger = logging.getLogger('yaml_widgets')
+
+        #
+        # Save widgetinfo
+        #
+        self.widgetinfo = widget_info
 
         #
         # Current container state
@@ -53,13 +64,15 @@ class ContainerWidgets():
         self.stack = []
 
 
-    def startContainer(self, ctype, name=None):
+    def startContainer(self, ctype, name=None, nested=False):
         """ Start a new nested container """
 
-        # TBD: Fix condition
-        if self.s.ctype == "VBox" and ctype == "VBox":
+        #
+        # We may optionally close the current container an start a new one
+        #
+        if not nested:
             #
-            # Part of a sequence of VBoxes, finish current container
+            # Part of a sequence of containers, so finish current container
             #
             self.logger.debug("Creating a VBox container in a container - assuming sequential")
             new_child = self.finishContainer()
@@ -67,15 +80,11 @@ class ContainerWidgets():
         #
         # Create the widget and add as a new child of current container
         #
+        # TBD: Use information from WidgetInfo....
+        #
         self.logger.debug(f"Making a {ctype}/{name}")
 
-        if ctype == "VBox":
-            widget = widgets.VBox()
-        elif ctype == "Tab":
-            widget = widgets.Tab()
-
-        self.logger.debug(f"Widget: {widget}")
-
+        widget = self.widgetinfo[ctype].widget()
         self.s.addWidget(widget, name)
 
         #
@@ -84,7 +93,7 @@ class ContainerWidgets():
         self.stack.append(self.s)
 
         #
-        # Initailize new container widget
+        # Initialize new container widget
         #
         self.s = ContainerState(ctype, name, widget)
 

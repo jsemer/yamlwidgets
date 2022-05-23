@@ -11,22 +11,11 @@ import ipywidgets as widgets
 from ipywidgets import interactive
 
 from .container_widgets import ContainerWidgets
+from .widget_info import WidgetInfo
 
 module_logger = logging.getLogger('yaml_widgets')
 debug1 = logging.DEBUG+1
 debug2 = logging.DEBUG+2
-
-
-class WidgetInfo():
-    """ Information about each widget type """
-
-    def __init__(self, widget, standard, container):
-        """ Initailize a widget type """
-
-        self.widget = widget
-        self.standard = standard
-        self.container = container
-
 
 
 class YamlWidgets():
@@ -94,8 +83,8 @@ class YamlWidgets():
         #
         # Create container management object and start outer container
         #
-        self.containers = ContainerWidgets()
-        self.containers.startContainer("VBox",name="ROOT")
+        self.containers = ContainerWidgets(self.widgetinfo)
+        self.containers.startContainer("VBox", name="ROOT", nested=True)
 
         #
         # Set up a top level widget
@@ -138,12 +127,19 @@ class YamlWidgets():
 
         wi['Dropdown'] = WidgetInfo(widgets.Dropdown, True, False)
         wi['RadioButtons'] = WidgetInfo(widgets.RadioButtons, True, False)
+        wi['SelectMultiple'] = WidgetInfo(widgets.SelectMultiple, True, False)
 
         #
         # Container controls
         #
+        wi['Accordion'] = WidgetInfo(widgets.Accordion, False, True)
         wi['Tab'] = WidgetInfo(widgets.Tab, False, True)
         wi['VBox'] = WidgetInfo(widgets.VBox, False, True)
+
+        #
+        # Special controls
+        #
+        wi['Close'] = WidgetInfo(None, False, False)
 
         return wi
 
@@ -328,14 +324,12 @@ class YamlWidgets():
                 #
                 # Handle a single widget directive
                 #
-                self.logger.log(debug2, f"Not in list {value}")
                 self._createWidget(value, flattened_name, yaml_dict, target_tag)
             else:
                 #
                 # Handle a list of widget directives
                 #
                 for n, v in enumerate(value):
-                    self.logger.log(debug2, f"In list {n}, {v}")
                     if n == 0:
                         self._createWidget(v, flattened_name, yaml_dict, target_tag)
                     else:
@@ -351,6 +345,13 @@ class YamlWidgets():
 
         """
         #
+        # Sanity check the wiget_info
+        #
+        if 'type' not in widget_info:
+            self.logger.error("Widget must have a type key: %s",flattened_name)
+            return
+
+        #
         # Memoize the target_{dict,tag} for this control
         #
         control_info = {}
@@ -360,19 +361,33 @@ class YamlWidgets():
         #
         # Make sure there is some value in the target_dict
         #
-        if yaml_dict is None:
+        if yaml_dict is not None:
+            if target_tag not in yaml_dict:
+                self.logger.error("Target tag not in yaml: %s", target_tag)
+                return
+        else:
             yaml_dict = {}
-
-        if target_tag not in yaml_dict:
             yaml_dict[target_tag] = None
 
         #
         # Parse the information about the control widget
         #
         widget_type = widget_info['type']
+        if widget_type not in self.widgetinfo:
+            self.logger.error("Unknown widget type: %s", widget_type)
+            return
+
         widget_args = {}
         if 'args' in widget_info:
             widget_args = widget_info['args']
+
+        #
+        # Handle close widget
+        #
+        if widget_type == 'Close':
+            self.logger.debug("Closing widget")
+            self.containers.finishContainer()
+            return
 
         #
         # Extract the chanacteristics of the widget
@@ -384,7 +399,7 @@ class YamlWidgets():
         #
         # Create widget for this target_{dict,tag}
         #
-        if widget_standard:
+        if widget_standard or widget_container:
 
             if 'description' not in widget_args:
                 # TBD: Change separator for flattened_name for display...
@@ -394,13 +409,16 @@ class YamlWidgets():
                 widget_args['value'] = yaml_dict[target_tag]
 
         #
-        # Handle container widgets ("Tab" and "Vbox")
+        # Handle container widgets (e.g, "VBox", "Tab" etc")
         #
         if widget_container:
             self.logger.debug(f"Starting {widget_type}: {yaml_dict[target_tag]}")
-            widget_name = yaml_dict[target_tag]
+            widget_name = widget_args['value']
+            widget_nested = 'nested' in widget_info and widget_info['nested']
 
-            new_control = self.containers.startContainer(widget_type, name=widget_name)
+            new_control = self.containers.startContainer(widget_type,
+                                                         name=widget_name,
+                                                         nested=widget_nested)
 
             control_info['widget'] = new_control
 
@@ -410,6 +428,7 @@ class YamlWidgets():
         # Handle normal widgets
         #
         if not widget_container:
+            self.logger.debug(f"{widget_constructor} - {widget_args}")
             new_control = widget_constructor(**widget_args)
             new_control.observe(self._set_params)
 
