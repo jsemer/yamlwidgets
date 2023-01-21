@@ -57,14 +57,14 @@ In a Jupyter cell create the controls
 ```
 yaml_widgets = YamlWidgets()
 
-yaml_widgets.setupWidgets(yaml_in)
-yaml_widgets.displayWidgets()
+yaml_widgets.load(yaml_in)
+yaml_widgets.display()
 
 ```
 
 In a Jupyter cell get the updated yaml string
 
 ```
-yaml_out = yaml_widgets.dumpWidgets()
+yaml_out = yaml_widgets.dump()
 
 ```
