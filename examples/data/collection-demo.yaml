@@ -1,0 +1,155 @@
+architecture:
+  # ============================================================
+  # Architecture Description
+  # ============================================================
+  version: 0.3
+  subtree:
+    - name: system
+      name-widget:
+        type: Tab
+        nested: True
+      local:
+        - name: DRAM
+          name-widget:
+            type: VBox
+            nested: True
+          class: DRAM
+          class-widget:
+            type: Text
+            args: {description: "Storage class"}
+          attributes:
+            type: LPDDR4
+            type-widget:
+              type: Dropdown
+              args: {description: "Type", options: ['LPDDR3', 'LPDDR4']}
+
+            dramsize: 1
+            dramsize-widget:
+              type: BoundedIntText
+              args: {description: "Size (MB)", min: 1, max: 8, step: 1}
+      subtree:
+        - name: CHIP
+          name-widget:
+            type: VBox
+          attributes:
+            technology: 45nm
+            technology-widget:
+              type: Dropdown
+              args:
+                description: "Technology"
+                options:
+                  - 16nm
+                  - 32nm
+                  - 45nm
+                  - 65nm
+              
+          local:
+            - name: GLB
+              name-widget:
+                type: VBox
+              glbbanks: 4
+              glbbanks-widget:
+                type: BoundedIntText
+                args:
+                  description: Banks
+                  min: 1
+                  max: 16
+                  step: 1
+              glbsize: 64
+              glbsize-widget:
+                type: BoundedIntText
+                args:
+                  description: "Size (KB)"
+                  min: 16
+                  max: 512
+                  step: 16
+          subtree:
+            - name: PE[0..255]
+              name-widget:
+                - type: VBox
+                  args: {name: "PE"}
+                - type: Text
+                  args: {description: "PEs"}
+              pex: 3
+              pex-widget:
+                - type: Tab
+                  nested: True
+                - type: VBox
+                  nested: True
+                  args: {value: "Grid"}
+                - type: Label
+                  args: {value: "PE Grid Array"}
+                - type: IntSlider
+                  args: {description: "PE - X", min: 1, max: 16, step: 1}
+              pey: 3
+              pey-widget:
+                - type: IntSlider
+                  args: {description: "PE - Y", min: 1, max: 16, step: 1}
+                - type: VBox
+                  args: {value: "RF"}
+                - type: Accordion
+                  nested: True
+              local:
+                - name: weight_reg
+                  name-widget:
+                    type: VBox
+                    nested: True
+                  attributes:
+                    weightdepth: 4
+                    weightdepth-widget:
+                      type: BoundedIntText
+                      args: {description: "Depth", min: 1, max: 32, step: 1}
+                    weightwidth: 4
+                    weightwidth-widget:
+                      type: Dropdown
+                      args: {description: "Width", options: [2, 4, 6, 8]}
+                    compressed: True
+                    compressed-widget:
+                      type: Dropdown
+                      args: {description: "Compressed", options: [False, True]}
+                - name: input_activation_reg
+                  name-widget:
+                    type: VBox
+                  attributes:
+                    iactdepth: 5
+                    iactdepth-widget:
+                      type: BoundedIntText
+                      args: {description: "Depth", min: 1, max: 32, step: 1}
+                    iactwidth: 6
+                    iactwidth-widget:
+                      type: Dropdown
+                      args: {description: "Width", options: [2, 4, 6, 8]}
+                    compressed: False
+                    compressed-widget:
+                      type: Dropdown
+                      args: {description: "Compressed", options: [False, True]}
+                - name: output_activation_reg
+                  name-widget:
+                    - type: VBox
+                  attributes:
+                    oactdepth: 6
+                    oactdepth-widget:
+                      type: BoundedIntText
+                      args: {description: "Depth", min: 1, max: 32, step: 1}
+                    oactwidth: 8
+                    oactwidth-widget:
+                      type: RadioButtons
+                      args: {description: "Width", options: [2, 4, 6, 8]}
+                    compressed: False
+                    compressed-widget:
+                      - type: Checkbox
+                        args: {description: "Compressed"}
+                      - type: Close                          # Close oact accordion
+                      - type: Close                          # Close RF tab
+                - name: mac
+                  name-widget:
+                    type: VBox                             # Start MAC tab
+                    args: {value: "MAC Config"}
+                  attributes:
+                    mac1: 7
+                    mac1-widget:
+                      - type: Label
+                        args: {value: "MAC information"}
+                      - type: BoundedIntText
+                        args: {description: "mac1", min: 1, max: 8, step: 1}
+
