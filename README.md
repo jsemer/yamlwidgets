@@ -20,9 +20,8 @@ Demonstration
 ==============
 
 The directory `./examples/notebooks` contains notebooks that demonstrate some
-of the capabilities of this package. You can run them in Google Colab:
-
-- [Simple demo](https://colab.research.google.com/github/jsemer/yamlwidgets/blob/master/examples/notebooks/yaml-widgets.ipynb)
+of the capabilities of this package. You can run them in Google Colab 
+[here](https://colab.research.google.com/github/jsemer/yamlwidgets/blob/master/examples/notebooks/yaml-widgets.ipynb)
 
 Usage
 =======
